@@ -1,102 +1,44 @@
 const express = require('express');
-const axios = require('axios');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-
+const axios = require('axios');
 const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(bodyParser.json());
 
-// Fonction pour convertir une date en timestamp Unix (ms)
-function toTimestamp(date) {
-    return new Date(date).getTime();
-}
+// Endpoint unique
+app.get('/api/profit', async (req, res) => {
+  try {
+    const { symbol, start, end } = req.query;
+    
+    // Récupération données Binance
+    const response = await axios.get('https://api.binance.com/api/v3/klines', {
+      params: {
+        symbol: symbol.toUpperCase(),
+        interval: '1d',
+        startTime: start,
+        endTime: end,
+        limit: 1000
+      }
+    });
 
-// Fonction pour valider les entrées utilisateur
-function validateInput(symbol, dailyInvestment, startDate, endDate) {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // Format YYYY-MM-DD
+    const data = response.data;
+    if (data.length < 2) return res.status(400).json({ error: 'Pas assez de données' });
 
-    if (!symbol.match(/^[A-Z]{3,5}[A-Z]{3}$/)) {
-        throw new Error("Le symbole de la cryptomonnaie doit être au format 'BTCUSDT'.");
-    }
-    if (isNaN(dailyInvestment) || dailyInvestment <= 0) {
-        throw new Error("Le montant de l'investissement journalier doit être un nombre positif.");
-    }
-    if (!startDate.match(dateRegex) || !endDate.match(dateRegex)) {
-        throw new Error("Les dates doivent être au format YYYY-MM-DD.");
-    }
-}
+    // Calculs basiques
+    const firstPrice = parseFloat(data[0][4]); // Prix de fermeture du premier jour
+    const lastPrice = parseFloat(data[data.length - 1][4]); // Prix de fermeture dernier jour
+    const profit = ((lastPrice - firstPrice) / firstPrice) * 100;
 
-// Route pour calculer le bénéfice ou la perte
-app.post('/calculate', async (req, res) => {
-    const { symbol, dailyInvestment, startDate, endDate } = req.body;
+    res.json({
+      symbol,
+      startPrice: firstPrice,
+      endPrice: lastPrice,
+      profit: profit.toFixed(2)
+    });
 
-    try {
-        validateInput(symbol, dailyInvestment, startDate, endDate);
-
-        const startTime = toTimestamp(startDate);
-        const endTime = toTimestamp(endDate);
-        let totalInvested = 0;
-        let totalBTC = 0;
-        let currentStartTime = startTime;
-        let lastPrice = 0;
-        let startPrice = null; // Initialiser startPrice à null
-
-        while (currentStartTime < endTime) {
-            const response = await axios.get('https://api.binance.com/api/v3/klines', {
-                params: {
-                    symbol: symbol,
-                    interval: '1d',
-                    startTime: currentStartTime,
-                    endTime: Math.min(currentStartTime + 1000 * 86400000, endTime),
-                    limit: 1000
-                }
-            });
-
-            const data = response.data;
-
-            if (data.length === 0) {
-                break; // Sortir si aucune donnée n'est disponible
-            }
-
-            for (const day of data) {
-                const closePrice = parseFloat(day[4]);
-                totalBTC += dailyInvestment / closePrice;
-                totalInvested += dailyInvestment;
-                lastPrice = closePrice;
-
-                if (startPrice === null) {
-                    startPrice = closePrice; // Assignation du prix initial
-                }
-            }
-
-            currentStartTime += 1000 * 86400000;
-        }
-
-        if (startPrice === null) {
-            return res.status(400).json({ error: "Aucune donnée disponible pour la période spécifiée." });
-        }
-
-        const portfolioValue = totalBTC * lastPrice;
-        const profitOrLoss = portfolioValue - totalInvested;
-
-        res.json({
-            symbol,
-            totalInvested,
-            portfolioValue,
-            startPrice,
-            lastPrice,
-            profitOrLoss,
-            percentageChange: ((profitOrLoss / totalInvested) * 100).toFixed(2)
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
+  } catch (error) {
+    res.status(500).json({ error: 'Erreur de récupération' });
+  }
 });
 
-// Démarrer le serveur
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-});
+app.listen(3001, () => console.log('Serveur prêt sur port 3001'));
