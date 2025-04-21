@@ -5,7 +5,6 @@ const app = express();
 
 app.use(cors());
 
-// Endpoint unique
 app.get('/api/profit', async (req, res) => {
   try {
     const { symbol, start, end } = req.query;
@@ -40,5 +39,5 @@ app.get('/api/profit', async (req, res) => {
     res.status(500).json({ error: 'Erreur de récupération' });
   }
 });
-
-app.listen(3001, () => console.log('Serveur prêt sur port 3001'));
+const PORT = process.env.PORT || 3001;
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
