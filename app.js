@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const bodyParser = require('body-parser');														
+const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();
@@ -57,7 +57,6 @@ app.post('/calculate', async (req, res) => {
 
             const data = response.data;
 
-            // Vérifiez si des données ont été récupérées
             if (data.length === 0) {
                 break; // Sortir si aucune donnée n'est disponible
             }
@@ -68,17 +67,14 @@ app.post('/calculate', async (req, res) => {
                 totalInvested += dailyInvestment;
                 lastPrice = closePrice;
 
-                // Assigner le prix initial uniquement lors de la première journée d'investissement
                 if (startPrice === null) {
                     startPrice = closePrice; // Assignation du prix initial
                 }
             }
 
-            // Avancer dans la période
             currentStartTime += 1000 * 86400000;
         }
 
-        // Vérifiez que startPrice a été assigné
         if (startPrice === null) {
             return res.status(400).json({ error: "Aucune donnée disponible pour la période spécifiée." });
         }
